@@ -220,7 +220,7 @@ class MiMotionRunner:
         finddate = re.compile(r".*?date%22%3A%22(.*?)%22%2C%22data.*?")
         findstep = re.compile(r".*?ttl%5C%22%3A(.*?)%2C%5C%22dis.*?")
         data_json = re.sub(finddate.findall(data_json)[0], today, str(data_json))
-        data_json = re.sub(findstep.findall(data_json)[0], current_step, str(data_json))
+        data_json = re.sub(findstep.findall(data_json)[0], str(current_step), str(data_json))
 
         url = f'https://api-mifit-cn.huami.com/v1/data/band_data.json?&t={t}'
         head = {
