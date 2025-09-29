@@ -44,16 +44,17 @@ def get_int_value_default(_config: dict, _key, default):
     return int(_config.get(_key))
 
 
-# 获取当前时间对应的最大和最小步数
-def get_min_max_by_time(hour=None, minute=None):
+# 获取2的倍数步数
+def get_binary_steps(hour=None, minute=None):
     if hour is None:
         hour = time_bj.hour
-    if minute is None:
-        minute = time_bj.minute
-    time_rate = min((hour * 60 + minute) / (22 * 60), 1)
-    min_step = get_int_value_default(config, 'MIN_STEP', 18000)
-    max_step = get_int_value_default(config, 'MAX_STEP', 25000)
-    return int(time_rate * min_step), int(time_rate * max_step)
+
+    hour = max(8, min(20, hour))
+    # 计算步数基数
+    step_index = hour - 8
+    max_config_step = get_int_value_default(config, 'MAX_STEP', 16384)
+    now_step = min(2 ** (step_index + 1), max_config_step)
+    return now_step
 
 
 # 虚拟ip地址
@@ -83,27 +84,6 @@ def get_access_token(location):
     if result is None or len(result) == 0:
         return None
     return result[0]
-
-
-# pushplus消息推送
-def push_plus(title, content):
-    requestUrl = f"http://www.pushplus.plus/send"
-    data = {
-        "token": PUSH_PLUS_TOKEN,
-        "title": title,
-        "content": content,
-        "template": "html",
-        "channel": "wechat"
-    }
-    try:
-        response = requests.post(requestUrl, data=data)
-        if response.status_code == 200:
-            json_res = response.json()
-            print(f"pushplus推送完毕：{json_res['code']}-{json_res['msg']}")
-        else:
-            print("pushplus推送失败")
-    except:
-        print("pushplus推送异常")
 
 
 class MiMotionRunner:
@@ -169,8 +149,8 @@ class MiMotionRunner:
         except:
             self.log_str += f"获取accessToken异常:{traceback.format_exc()}\n"
             return 0, 0
-        # print("access_code获取成功！")
-        # print(code)
+        print("access_code获取成功！")
+        print(code)
 
         url2 = "https://account.huami.com/v2/client/login"
         if self.is_phone:
@@ -202,11 +182,11 @@ class MiMotionRunner:
             }
         r2 = requests.post(url2, data=data2, headers=headers).json()
         login_token = r2["token_info"]["login_token"]
-        # print("login_token获取成功！")
-        # print(login_token)
+        print("login_token获取成功！")
+        print(login_token)
         userid = r2["token_info"]["user_id"]
-        # print("userid获取成功！")
-        # print(userid)
+        print("userid获取成功！")
+        print(userid)
 
         return login_token, userid
 
@@ -216,16 +196,15 @@ class MiMotionRunner:
         headers = {'User-Agent': 'MiFit/5.3.0 (iPhone; iOS 14.7.1; Scale/3.00)', 'X-Forwarded-For': self.fake_ip_addr}
         response = requests.get(url, headers=headers).json()
         app_token = response['token_info']['app_token']
-        # print("app_token获取成功！")
-        # print(app_token)
+        print("app_token获取成功！")
+        print(app_token)
         return app_token
 
     # 主函数
-    def login_and_post_step(self, min_step, max_step):
+    def login_and_post_step(self, current_step):
         if self.invalid:
             return "账号或密码配置有误", False
-        step = str(random.randint(min_step, max_step))
-        self.log_str += f"已设置为随机步数范围({min_step}~{max_step}) 随机值:{step}\n"
+        self.log_str += f"已设置为固定步数:{current_step}\n"
         login_token, userid = self.login()
         if login_token == 0:
             return "登陆失败！", False
@@ -241,7 +220,7 @@ class MiMotionRunner:
         finddate = re.compile(r".*?date%22%3A%22(.*?)%22%2C%22data.*?")
         findstep = re.compile(r".*?ttl%5C%22%3A(.*?)%2C%5C%22dis.*?")
         data_json = re.sub(finddate.findall(data_json)[0], today, str(data_json))
-        data_json = re.sub(findstep.findall(data_json)[0], step, str(data_json))
+        data_json = re.sub(findstep.findall(data_json)[0], current_step, str(data_json))
 
         url = f'https://api-mifit-cn.huami.com/v1/data/band_data.json?&t={t}'
         head = {
@@ -253,31 +232,8 @@ class MiMotionRunner:
         data = f'userid={userid}&last_sync_data_time=1597306380&device_type=0&last_deviceid=DA932FFFFE8816E7&data_json={data_json}'
 
         response = requests.post(url, data=data, headers=head).json()
-        # print(response)
-        return f"修改步数（{step}）[" + response['message'] + "]", True
-
-
-# 启动主函数
-def push_to_push_plus(exec_results, summary):
-    # 判断是否需要pushplus推送
-    if PUSH_PLUS_TOKEN is not None and PUSH_PLUS_TOKEN != '' and PUSH_PLUS_TOKEN != 'NO':
-        if PUSH_PLUS_HOUR is not None and PUSH_PLUS_HOUR.isdigit():
-            if time_bj.hour != int(PUSH_PLUS_HOUR):
-                print(f"当前设置push_plus推送整点为：{PUSH_PLUS_HOUR}, 当前整点为：{time_bj.hour}，跳过推送")
-                return
-        html = f'<div>{summary}</div>'
-        if len(exec_results) >= PUSH_PLUS_MAX:
-            html += '<div>账号数量过多，详细情况请前往github actions中查看</div>'
-        else:
-            html += '<ul>'
-            for exec_result in exec_results:
-                success = exec_result['success']
-                if success is not None and success is True:
-                    html += f'<li><span>账号：{exec_result["user"]}</span>刷步数成功，接口返回：{exec_result["msg"]}</li>'
-                else:
-                    html += f'<li><span>账号：{exec_result["user"]}</span>刷步数失败，失败原因：{exec_result["msg"]}</li>'
-            html += '</ul>'
-        push_plus(f"{format_now()} 刷步数通知", html)
+        print(response)
+        return f"修改步数（{current_step}）[" + response['message'] + "]", True
 
 
 def run_single_account(total, idx, user_mi, passwd_mi):
@@ -287,7 +243,7 @@ def run_single_account(total, idx, user_mi, passwd_mi):
     log_str = f"[{format_now()}]\n{idx_info}账号：{desensitize_user_name(user_mi)}"
     try:
         runner = MiMotionRunner(user_mi, passwd_mi)
-        exec_msg, success = runner.login_and_post_step(min_step, max_step)
+        exec_msg, success = runner.login_and_post_step(current_step)
         log_str += runner.log_str
         log_str += f'{exec_msg}\n'
         exec_result = {"user": user_mi, "success": success,
@@ -319,16 +275,6 @@ def execute():
                 if idx < total:
                     # 每个账号之间间隔一定时间请求一次，避免接口请求过于频繁导致异常
                     time.sleep(sleep_seconds)
-
-        success_count = 0
-        push_results = []
-        for result in exec_results:
-            push_results.append(result)
-            if result['success'] is True:
-                success_count += 1
-        summary = f"\n执行账号总数{total}，成功：{success_count}，失败：{total - success_count}"
-        print(summary)
-        push_to_push_plus(push_results, summary)
     else:
         print(f"账号数长度[{len(user_list)}]和密码数长度[{len(passwd_list)}]不匹配，跳过执行")
         exit(1)
@@ -337,7 +283,7 @@ def execute():
 if __name__ == "__main__":
     # 北京时间
     time_bj = get_beijing_time()
-    if os.environ.__contains__("CONFIG") is False:
+    if not os.environ.__contains__("CONFIG"):
         print("未配置CONFIG变量，无法执行")
         exit(1)
     else:
@@ -349,9 +295,6 @@ if __name__ == "__main__":
             print("CONFIG格式不正确，请检查Secret配置，请严格按照JSON格式：使用双引号包裹字段和值，逗号不能多也不能少")
             traceback.print_exc()
             exit(1)
-        PUSH_PLUS_TOKEN = config.get('PUSH_PLUS_TOKEN')
-        PUSH_PLUS_HOUR = config.get('PUSH_PLUS_HOUR')
-        PUSH_PLUS_MAX = get_int_value_default(config, 'PUSH_PLUS_MAX', 30)
         sleep_seconds = config.get('SLEEP_GAP')
         if sleep_seconds is None or sleep_seconds == '':
             sleep_seconds = 5
@@ -361,7 +304,7 @@ if __name__ == "__main__":
         if users is None or passwords is None:
             print("未正确配置账号密码，无法执行")
             exit(1)
-        min_step, max_step = get_min_max_by_time()
+        current_step = get_binary_steps()
         use_concurrent = config.get('USE_CONCURRENT')
         if use_concurrent is not None and use_concurrent == 'True':
             use_concurrent = True
