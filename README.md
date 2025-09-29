@@ -1,4 +1,14 @@
-# mimotion
+# mimotion魔改版
+
+# 魔改版说明
+- 由于是个人使用，按需修改了部分代码
+  - 删除了消息推送功能
+  - 修改了步数更新逻辑，按当前时刻对应2的幂次数步数
+  - 修改了cron表达式，早8到晚8，共执行13次
+
+以下为原仓库readme
+
+---
 
 ![ 刷步数](https://github.com/TonyJiangWJ/mimotion/actions/workflows/run.yml/badge.svg)
 [![GitHub forks](https://img.shields.io/github/forks/TonyJiangWJ/mimotion?style=flat-square)](https://github.com/TonyJiangWJ/mimotion/forks)
