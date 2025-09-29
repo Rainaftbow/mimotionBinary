@@ -6,6 +6,18 @@
   - 修改了步数更新逻辑，按当前时刻对应2的幂次数步数
   - 修改了cron表达式，早8到晚8，共执行13次
 
+- CONFIG的内容：
+
+  ```json
+  {
+    "USER": "abcxxx@xx.com",
+    "PWD": "password",
+    "MAX_STEP": "16384",
+    "SLEEP_GAP": "5",
+    "USE_CONCURRENT": "False"
+  }
+  ```
+
 以下为原仓库readme
 
 ---
